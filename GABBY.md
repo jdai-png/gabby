@@ -33,7 +33,7 @@ Pi is great, but cold-boot startup has room for improvement. Gabby experiments w
 
 ```bash
 # Clone and install
-git clone https://github.com/jdai-png/pi.git
+git clone https://github.com/jdai-png/gabby.git
 cd pi
 npm install --ignore-scripts
 
