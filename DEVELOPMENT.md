@@ -55,6 +55,26 @@ cd packages/coding-agent && npx tsgo --noEmit
 cd /path/to/gabby && npx tsgo --noEmit
 ```
 
+## Branch Strategy
+
+```
+upstream/main  ←──  main (tracks upstream exactly)
+                     │
+                     │ merge (no rebase)
+                     ▼
+                   rc (Gabby's source of truth)
+                     │
+                     │ branch
+                     ▼
+               feat/* (feature branches)
+```
+
+| Branch | Purpose |
+|--------|---------|
+| `main` | Tracks `earendil-works/pi:main` — never commit directly |
+| `rc` | Gabby's stable branch — all customizations live here |
+| `feat/*` | Feature branches based on `rc` |
+
 ## Merging Upstream Changes
 
 Upstream is `earendil-works/pi`. The fork tracks it via the `upstream` remote.
@@ -66,20 +86,24 @@ git remote add upstream git@github.com:earendil-works/pi.git
 # Fetch latest from upstream
 git fetch upstream
 
-# Update main branch
+# Update main to match upstream exactly
 git checkout main
 git merge upstream/main          # fast-forwards if no local commits on main
 
-# Rebase the feature branch onto updated main
-git checkout feat/cold-boot-optimizations
-git rebase main
+# Merge upstream changes into rc
+git checkout rc
+git merge main                   # brings upstream changes into Gabby
 
 # Resolve any conflicts, then:
 #   git add <resolved-files>
-#   git rebase --continue
+#   git commit
 
-# Push the rebased branch
-git push --force-with-lease origin feat/cold-boot-optimizations
+# Push updated rc
+git push origin rc
+
+# Rebase active feature branches onto updated rc
+git checkout feat/cold-boot-optimizations
+git rebase rc
 ```
 
 ### Conflict Resolution Tips
