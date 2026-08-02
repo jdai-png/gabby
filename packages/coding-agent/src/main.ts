@@ -533,8 +533,16 @@ export async function main(args: string[], options?: MainOptions) {
 
 	const cwd = process.cwd();
 	const agentDir = getAgentDir();
+
+	// Create a single startup SettingsManager and reuse it wherever the trust state
+	// matches. Previously this was created 3 separate times (bootstrap, startup, runtime),
+	// each reading the same settings.json files from disk and acquiring file locks.
+	// Bootstrap still needs its own untrusted instance for early package/config commands.
+	// The main startupSettingsManager is created once here and threaded into the initial
+	// runtime creation so we avoid a redundant file read + lock acquisition.
 	const bootstrapSettingsManager = SettingsManager.create(cwd, agentDir, { projectTrusted: false });
-	applyHttpProxySettings(bootstrapSettingsManager.getGlobalSettings().httpProxy);
+	const startupSettingsManager = SettingsManager.create(cwd, agentDir);
+	applyHttpProxySettings(startupSettingsManager.getGlobalSettings().httpProxy);
 	configureHttpDispatcher();
 
 	if (await handlePackageCommand(args, { extensionFactories })) {
@@ -607,7 +615,6 @@ export async function main(args: string[], options?: MainOptions) {
 	const { migratedAuthProviders: migratedProviders, deprecationWarnings } = runMigrations(cwd);
 	time("runMigrations");
 
-	const startupSettingsManager = SettingsManager.create(cwd, agentDir);
 	reportDiagnostics(collectSettingsDiagnostics(startupSettingsManager, "startup session lookup"));
 
 	// Experimental first-time setup: theme choice and analytics opt-in.
@@ -682,7 +689,13 @@ export async function main(args: string[], options?: MainOptions) {
 			: (cachedProjectTrust ??
 				parsed.projectTrustOverride ??
 				(!hasTrustRequiringResources || trustStore.get(cwd) === true));
-		const runtimeSettingsManager = SettingsManager.create(cwd, agentDir, { projectTrusted });
+		// Reuse startupSettingsManager when projectTrusted matches (the common case for
+		// the initial runtime). Only create a fresh instance when trust state differs
+		// (e.g. after a session switch into a different project).
+		const runtimeSettingsManager =
+			startupSettingsManager.isProjectTrusted() === projectTrusted
+				? startupSettingsManager
+				: SettingsManager.create(cwd, agentDir, { projectTrusted });
 		const services = await createAgentSessionServices({
 			cwd,
 			agentDir,

@@ -163,8 +163,9 @@ export class ModelRuntime implements Models {
 		runtime.rebuildProviders();
 		const refreshFromNetwork = runtime.modelNetworkEnabled && options.allowModelNetwork === true;
 		const controller = refreshFromNetwork ? new AbortController() : undefined;
+		const defaultTimeoutMs = parseInt(process.env.PI_MODEL_REFRESH_TIMEOUT_MS ?? "", 10) || 30_000;
 		const timeout = controller
-			? setTimeout(() => controller.abort(), options.modelRefreshTimeoutMs ?? 15_000)
+			? setTimeout(() => controller.abort(), options.modelRefreshTimeoutMs ?? defaultTimeoutMs)
 			: undefined;
 		try {
 			await runtime.refresh({ allowNetwork: refreshFromNetwork, signal: controller?.signal });

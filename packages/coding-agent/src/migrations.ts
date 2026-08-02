@@ -5,13 +5,45 @@
 import chalk from "chalk";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
-import { CONFIG_DIR_NAME, getAgentDir, getBinDir } from "./config.ts";
+import { CONFIG_DIR_NAME, getAgentDir, getBinDir, VERSION } from "./config.ts";
 import { migrateKeybindingsConfig } from "./core/keybindings.ts";
 
 const MIGRATION_GUIDE_URL =
 	"https://github.com/earendil-works/pi-mono/blob/main/packages/coding-agent/CHANGELOG.md#extensions-migration";
 const EXTENSIONS_DOC_URL =
 	"https://github.com/earendil-works/pi-mono/blob/main/packages/coding-agent/docs/extensions.md";
+
+/** Path to a sentinel file that records the last version for which migrations ran. */
+function getMigrationSentinelPath(): string {
+	return join(getAgentDir(), ".migration-version");
+}
+
+/**
+ * Check whether migrations have already run for the current version.
+ * Returns true if migrations should be skipped (already ran for this version).
+ */
+function hasMigrationsRunForCurrentVersion(): boolean {
+	const sentinelPath = getMigrationSentinelPath();
+	try {
+		if (!existsSync(sentinelPath)) return false;
+		const migratedVersion = readFileSync(sentinelPath, "utf-8").trim();
+		return migratedVersion === VERSION;
+	} catch {
+		return false;
+	}
+}
+
+/** Record that migrations ran for the current version. */
+function markMigrationsRun(): void {
+	const sentinelPath = getMigrationSentinelPath();
+	try {
+		const dir = dirname(sentinelPath);
+		if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+		writeFileSync(sentinelPath, `${VERSION}\n`, "utf-8");
+	} catch {
+		// Best-effort; failure to write the sentinel just means migrations run next time too.
+	}
+}
 
 /**
  * Migrate legacy oauth.json and settings.json apiKeys to auth.json.
@@ -306,10 +338,21 @@ export function runMigrations(cwd: string): {
 	migratedAuthProviders: string[];
 	deprecationWarnings: string[];
 } {
+	// Skip all migration checks if they already ran for the current version.
+	// Individual migrations are idempotent by design, but the filesystem checks
+	// (existsSync, readdirSync, etc.) add measurable cold-boot overhead.
+	if (hasMigrationsRunForCurrentVersion()) {
+		return { migratedAuthProviders: [], deprecationWarnings: [] };
+	}
+
 	const migratedAuthProviders = migrateAuthToAuthJson();
 	migrateSessionsFromAgentRoot();
 	migrateToolsToBin();
 	migrateKeybindingsConfigFile();
 	const deprecationWarnings = migrateExtensionSystem(cwd);
+
+	// Record that migrations ran for this version so we skip them on subsequent boots.
+	markMigrationsRun();
+
 	return { migratedAuthProviders, deprecationWarnings };
 }
