@@ -29,36 +29,7 @@ Pi is great, but cold-boot startup has room for improvement. Gabby experiments w
 - Extension compilation caching (jiti output to disk)
 - Async settings I/O
 
-## Development
-
-```bash
-# Clone and install
-git clone https://github.com/jdai-png/gabby.git
-cd pi
-npm install --ignore-scripts
-
-# Build
-npm run build
-
-# The gabby command runs from the dev dist/
-# It's symlinked at /opt/homebrew/bin/gabby → ~/Desktop/pi/packages/coding-agent/dist/cli.js
-```
-
-### Workflow
-
-1. Edit source in `packages/coding-agent/src/`
-2. Rebuild: `cd packages/coding-agent && npm run build`
-3. `gabby` picks up changes immediately (no reinstall needed)
-
-### Keeping in Sync
-
-```bash
-git fetch upstream
-git checkout main
-git merge upstream/main
-git checkout feat/cold-boot-optimizations
-git rebase main
-```
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for build, rebuild, and upstream merge instructions.
 
 ## License
 
